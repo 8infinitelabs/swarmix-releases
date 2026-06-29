@@ -1,0 +1,75 @@
+# Build the Swarmix desktop app from the PRIVATE source repo and publish the
+# signed release + latest.json HERE (public), so the in-app auto-updater can
+# fetch it without auth. Dispatch with the private-repo tag to build, e.g.
+# `ref: v0.1.92`.
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "swarmixapp tag to build (e.g. v0.1.92)"
+        required: true
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            triple: aarch64-apple-darwin
+            node_bin: node
+          - os: windows-latest
+            triple: x86_64-pc-windows-msvc
+            node_bin: node.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Check out the PRIVATE source at the requested tag via a read-only deploy key.
+      - uses: actions/checkout@v4
+        with:
+          repository: 8infinitelabs/swarmixapp
+          ref: ${{ inputs.ref }}
+          ssh-key: ${{ secrets.SOURCE_DEPLOY_KEY }}
+
+      - name: Verify the source version matches the ref
+        shell: bash
+        run: |
+          CONF=$(grep -m1 '"version"' apps/desktop/src-tauri/tauri.conf.json | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+          REF="${{ inputs.ref }}"; REF="${REF#v}"
+          if [ "$CONF" != "$REF" ]; then
+            echo "::error::ref v$REF does not match tauri.conf.json version $CONF"; exit 1
+          fi
+          echo "version ok: $CONF"
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.triple }}
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - name: Stage Node runtime as externalBin
+        shell: bash
+        run: |
+          mkdir -p apps/desktop/src-tauri/binaries
+          NODE_PATH="$(which ${{ matrix.node_bin }})"
+          EXT=""
+          [[ "${{ matrix.os }}" == windows-* ]] && EXT=".exe"
+          cp "$NODE_PATH" "apps/desktop/src-tauri/binaries/node-${{ matrix.triple }}${EXT}"
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ inputs.ref }}
+          releaseName: "Swarmix ${{ inputs.ref }}"
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          args: --target ${{ matrix.triple }}
