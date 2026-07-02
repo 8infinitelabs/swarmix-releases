@@ -60,6 +60,9 @@ jobs:
           EXT=""
           [[ "${{ matrix.os }}" == windows-* ]] && EXT=".exe"
           cp "$NODE_PATH" "apps/desktop/src-tauri/binaries/node-${{ matrix.triple }}${EXT}"
+      - name: Bundle llama-server (local AI runtime)
+        shell: bash
+        run: bash scripts/fetch-llama.sh
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
