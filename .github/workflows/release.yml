@@ -13,6 +13,11 @@ jobs:
   release:
     permissions:
       contents: write
+    # Windows code signing (Azure Trusted Signing) turns on only when the Azure
+    # service-principal secret exists; otherwise Windows ships unsigned as before.
+    # Setup + which secrets/vars to add: swarmixapp docs/windows-signing.md
+    env:
+      SIGN_WIN: ${{ secrets.AZURE_CLIENT_ID != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -63,11 +68,36 @@ jobs:
       - name: Bundle llama-server (local AI runtime)
         shell: bash
         run: bash scripts/fetch-llama.sh
+
+      # Windows code signing via Azure Trusted Signing. Only runs when the Azure
+      # service-principal secret is set; writes a partial Tauri config that adds
+      # bundle.windows.signCommand (the committed tauri.conf.json stays unsigned).
+      - name: Configure Windows signing (Azure Trusted Signing)
+        id: winsign
+        if: matrix.os == 'windows-latest' && env.SIGN_WIN == 'true'
+        shell: pwsh
+        env:
+          AZ_ENDPOINT: ${{ vars.AZURE_SIGN_ENDPOINT }}
+          AZ_ACCOUNT: ${{ vars.AZURE_SIGN_ACCOUNT }}
+          AZ_PROFILE: ${{ vars.AZURE_SIGN_PROFILE }}
+        run: |
+          cargo install trusted-signing-cli --locked
+          $cmd = "trusted-signing-cli -e $env:AZ_ENDPOINT -a $env:AZ_ACCOUNT -c $env:AZ_PROFILE -d Swarmix %1"
+          $partial = @{ bundle = @{ windows = @{ signCommand = $cmd } } } | ConvertTo-Json -Depth 10
+          Set-Content -Path apps/desktop/sign.win.json -Value $partial -Encoding utf8
+          "config_arg=--config sign.win.json" >> $env:GITHUB_OUTPUT
+          Write-Host "Windows signing enabled: $cmd"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Azure Trusted Signing service-principal creds (used by trusted-signing-cli
+          # during bundling; unused when Windows signing isn't configured).
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         with:
           projectPath: apps/desktop
           tagName: ${{ inputs.ref }}
@@ -75,4 +105,5 @@ jobs:
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
-          args: --target ${{ matrix.triple }}
+          # steps.winsign.outputs.config_arg is empty unless Windows signing ran.
+          args: --target ${{ matrix.triple }} ${{ steps.winsign.outputs.config_arg }}
