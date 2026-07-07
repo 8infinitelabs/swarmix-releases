@@ -80,26 +80,18 @@ jobs:
           AZ_ENDPOINT: ${{ vars.AZURE_SIGN_ENDPOINT }}
           AZ_ACCOUNT: ${{ vars.AZURE_SIGN_ACCOUNT }}
           AZ_PROFILE: ${{ vars.AZURE_SIGN_PROFILE }}
-          # Creds so the self-test below can authenticate (same as tauri step).
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          RUST_LOG: debug
-          RUST_BACKTRACE: "1"
         run: |
+          # NOTE: trusted-signing-cli 0.11 is deprecated in favor of
+          # artifact-signing-cli (same author, Azure renamed the service). It
+          # still works; migrate the crate + command name when convenient.
+          # Gotcha proven the hard way: AZURE_CLIENT_SECRET must be the secret
+          # VALUE, not the Secret ID, or you get AADSTS7000215.
           cargo install trusted-signing-cli --locked
           $cmd = "trusted-signing-cli -e $env:AZ_ENDPOINT -a $env:AZ_ACCOUNT -c $env:AZ_PROFILE -d Swarmix %1"
           $partial = @{ bundle = @{ windows = @{ signCommand = $cmd } } } | ConvertTo-Json -Depth 10
           Set-Content -Path apps/desktop/sign.win.json -Value $partial -Encoding utf8
           "config_arg=--config sign.win.json" >> $env:GITHUB_OUTPUT
           Write-Host "Windows signing enabled: $cmd"
-          # --- Self-test: tauri swallows trusted-signing-cli's error, so run it
-          # --- directly on a throwaway PE and surface the REAL output. Non-fatal.
-          Write-Host "===== trusted-signing-cli self-test ====="
-          trusted-signing-cli --version 2>&1 | Write-Host
-          Copy-Item "apps/desktop/src-tauri/binaries/node-x86_64-pc-windows-msvc.exe" "selftest.exe" -Force
-          trusted-signing-cli -e $env:AZ_ENDPOINT -a $env:AZ_ACCOUNT -c $env:AZ_PROFILE -d SelfTest selftest.exe 2>&1 | Write-Host
-          Write-Host "===== self-test exit code: $LASTEXITCODE ====="
 
       - uses: tauri-apps/tauri-action@v0
         env:
