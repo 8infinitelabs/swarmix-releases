@@ -93,6 +93,14 @@ jobs:
           "config_arg=--config sign.win.json" >> $env:GITHUB_OUTPUT
           Write-Host "Windows signing enabled: $cmd"
 
+      # Published as a DRAFT here: each platform leg uploads its own assets, but
+      # the release must NOT go live (and GitHub's /releases/latest alias, which
+      # the in-app updater polls, must NOT resolve to it) until BOTH legs are
+      # done. The `finalize` job below flips draft->false only after both legs
+      # of this matrix succeed, so latest.json is always complete when it goes
+      # public. Root cause this fixes: macOS finishes ~7-10 min before Windows;
+      # publishing live per-leg left a window where Windows users hit "Couldn't
+      # check for updates right now" because latest.json only had darwin-*.
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -107,8 +115,23 @@ jobs:
           projectPath: apps/desktop
           tagName: ${{ inputs.ref }}
           releaseName: "Swarmix ${{ inputs.ref }}"
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
           # steps.winsign.outputs.config_arg is empty unless Windows signing ran.
           args: --target ${{ matrix.triple }} ${{ steps.winsign.outputs.config_arg }}
+
+  # Runs only after BOTH matrix legs (macOS + Windows) have succeeded and
+  # uploaded their assets to the draft release. Only then is the release
+  # published, so /releases/latest/download/latest.json (what the desktop
+  # auto-updater polls) never resolves to a release with only one platform.
+  finalize:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish release (undraft) now that all platforms are uploaded
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ inputs.ref }}" --draft=false --repo 8infinitelabs/swarmix-releases
