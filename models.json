@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-18",
+  "models": {
+    "qwen2.5-1.5b-q4": {
+      "hfRepo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+      "filename": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+      "sizeGb": 1.1,
+      "minFreeGb": 2,
+      "sha256": null
+    },
+    "qwen2.5-3b-q4": {
+      "hfRepo": "Qwen/Qwen2.5-3B-Instruct-GGUF",
+      "filename": "qwen2.5-3b-instruct-q4_k_m.gguf",
+      "sizeGb": 2,
+      "minFreeGb": 3,
+      "sha256": null
+    },
+    "gemma4-e4b-q4": {
+      "hfRepo": "ggml-org/gemma-4-E4B-it-GGUF",
+      "filename": "gemma-4-E4B-it-Q4_0.gguf",
+      "sizeGb": 4.59,
+      "minFreeGb": 6,
+      "sha256": "a555b900214b477d8880e7832e0b8925e139b0159640036b09fe472b6f2097f2",
+      "quantPreference": [
+        "Q4_K_M",
+        "Q4_0",
+        "Q8_0"
+      ]
+    },
+    "ministral3-3b-q4": {
+      "hfRepo": "mistralai/Ministral-3-3B-Instruct-2512-GGUF",
+      "filename": "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
+      "sizeGb": 2,
+      "minFreeGb": 3,
+      "sha256": null
+    },
+    "ministral3-8b-q4": {
+      "hfRepo": "mistralai/Ministral-3-8B-Instruct-2512-GGUF",
+      "filename": "Ministral-3-8B-Instruct-2512-Q4_K_M.gguf",
+      "sizeGb": 5,
+      "minFreeGb": 6,
+      "sha256": null
+    },
+    "ministral3-14b-q4": {
+      "hfRepo": "mistralai/Ministral-3-14B-Instruct-2512-GGUF",
+      "filename": "Ministral-3-14B-Instruct-2512-Q4_K_M.gguf",
+      "sizeGb": 8.8,
+      "minFreeGb": 10,
+      "sha256": null
+    }
+  }
+}
